@@ -3,6 +3,7 @@ import { View, Text, TextInput, Image, StyleSheet, TouchableOpacity } from 'reac
 import axios from 'axios';
 import config from '../../config'; // Make sure this path is correct
 import MessageBox from '../../utils/MessageBox'; // Reusable message box
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Login({ navigation }) {
   const [emailOrMobile, setEmailOrMobile] = useState('');
@@ -26,16 +27,20 @@ export default function Login({ navigation }) {
 
     try {
       const response = await axios.post(url, { emailOrMobile, password });
-      console.log('Login Response:', response.data);
+      console.log('Login Response:', response);
 
       if (response.data.success) {
-        const userName = response.data.name || "User"; // fallback
+        const userName = response.data.data.name; // fallback
+
+         await AsyncStorage.setItem("token", response.data.data.token);
+         await AsyncStorage.setItem("userName", userName)
+         console.log("Token",response.data.data.token);
         console.log(response.data);
         console.log(userName);
-  setMessage({
-    type: 'success',
-    text: `Welcome ${userName}! Login successful 🎉`,
-  });
+        setMessage({
+          type: 'success',
+          text: `Welcome ${userName}! Login successful 🎉`,
+        });
         // Redirect to Customer screen after 1 second
         setTimeout(() => {
           navigation.replace('Customer'); // make sure 'Customer' is registered in your navigator

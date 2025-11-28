@@ -2,6 +2,8 @@
 
  const ENDPOINTS = {
   LOGIN: "/Auth/login",
+  GET_CUSTOMERS:"/Customer",
+  ADD_CUSTOMER:"/Customer"
 };
 
 export default { BASE_URL, ENDPOINTS }
