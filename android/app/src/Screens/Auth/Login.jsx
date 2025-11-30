@@ -31,12 +31,16 @@ export default function Login({ navigation }) {
 
       if (response.data.success) {
         const userName = response.data.data.name; // fallback
+        const userId=String(response.data.data.userId);
 
          await AsyncStorage.setItem("token", response.data.data.token);
          await AsyncStorage.setItem("userName", userName)
+         await AsyncStorage.setItem("userId" ,userId)
+
          console.log("Token",response.data.data.token);
         console.log(response.data);
         console.log(userName);
+         console.log("User Id",userId);
         setMessage({
           type: 'success',
           text: `Welcome ${userName}! Login successful 🎉`,

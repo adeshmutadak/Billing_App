@@ -8,7 +8,7 @@ import axios from 'axios';
 import config from '../../config';
 import { COLORS, FONTS, SIZES } from '../../utils/theme';
 
-const AddCustomerModal = ({ visible, onClose, onSave }) => {
+const AddCustomerScreen = ({ visible, onSave, onClose }) => {
   const [userId, setUserId] = useState(null);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -22,7 +22,7 @@ const AddCustomerModal = ({ visible, onClose, onSave }) => {
   useEffect(() => {
     const fetchUserId = async () => {
       const id = await AsyncStorage.getItem('userId');
-      if (id) setUserId(parseInt(id));
+      if (id) setUserId(Number(id));
     };
     fetchUserId();
   }, []);
@@ -41,6 +41,10 @@ const AddCustomerModal = ({ visible, onClose, onSave }) => {
   const handleSave = async () => {
     if (!name || !address || !phoneNumber || !cowRate || !buffaloRate) {
       Alert.alert("Error", "Please fill all required fields");
+      return;
+    }
+    if (!userId) {
+      Alert.alert("Error", "User ID not found");
       return;
     }
 
@@ -66,8 +70,7 @@ const AddCustomerModal = ({ visible, onClose, onSave }) => {
 
       if (response.data.success) {
         Alert.alert("Success", "Customer added successfully!");
-        onSave?.();
-        onClose();
+        onSave?.(); // trigger callback to refresh customer list
       } else {
         Alert.alert("Error", response.data.message || "Failed to add customer");
       }
@@ -78,12 +81,7 @@ const AddCustomerModal = ({ visible, onClose, onSave }) => {
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose} // Android back button
-    >
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.modalOverlay} />
       </TouchableWithoutFeedback>
@@ -93,88 +91,28 @@ const AddCustomerModal = ({ visible, onClose, onSave }) => {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.heading}>Add New Customer</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.closeBtn}>✕</Text>
-            </TouchableOpacity>
+            <TouchableOpacity onPress={onClose}><Text style={styles.closeBtn}>✕</Text></TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
-            {/* Image Picker */}
             <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-              {photoBase64 ? (
-                <Image
-                  source={{ uri: `data:image/jpeg;base64,${photoBase64}` }}
-                  style={styles.customerImg}
-                />
-              ) : (
-                <Text style={styles.imagePickerText}>Pick a Profile Image</Text>
-              )}
+              {photoBase64 ? <Image source={{ uri: `data:image/jpeg;base64,${photoBase64}` }} style={styles.customerImg} />
+              : <Text style={styles.imagePickerText}>Pick a Profile Image</Text>}
             </TouchableOpacity>
 
-            {/* Inputs */}
-            <TextInput
-              placeholder="Name*"
-              value={name}
-              onChangeText={setName}
-              style={styles.input}
-              placeholderTextColor={COLORS.textPrimary}
-            />
-            <TextInput
-              placeholder="Address*"
-              value={address}
-              onChangeText={setAddress}
-              style={styles.input}
-              placeholderTextColor={COLORS.textPrimary}
-            />
-            <TextInput
-              placeholder="Phone Number*"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              keyboardType="phone-pad"
-              style={styles.input}
-              placeholderTextColor={COLORS.textPrimary}
-            />
-            <TextInput
-              placeholder="Whatsapp Number"
-              value={whatsappNumber}
-              onChangeText={setWhatsappNumber}
-              keyboardType="phone-pad"
-              style={styles.input}
-              placeholderTextColor={COLORS.textPrimary}
-            />
-            <TextInput
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              style={styles.input}
-              placeholderTextColor={COLORS.textPrimary}
-            />
-            <TextInput
-              placeholder="Cow Rate*"
-              value={cowRate}
-              onChangeText={setCowRate}
-              keyboardType="numeric"
-              style={styles.input}
-              placeholderTextColor={COLORS.textPrimary}
-            />
-            <TextInput
-              placeholder="Buffalo Rate*"
-              value={buffaloRate}
-              onChangeText={setBuffaloRate}
-              keyboardType="numeric"
-              style={styles.input}
-              placeholderTextColor={COLORS.textPrimary}
-            />
+            <TextInput placeholder="Name*" value={name} onChangeText={setName} style={styles.input} placeholderTextColor={COLORS.textPrimary} />
+            <TextInput placeholder="Address*" value={address} onChangeText={setAddress} style={styles.input} placeholderTextColor={COLORS.textPrimary} />
+            <TextInput placeholder="Phone Number*" value={phoneNumber} onChangeText={setPhoneNumber} keyboardType="phone-pad" style={styles.input} placeholderTextColor={COLORS.textPrimary} />
+            <TextInput placeholder="Whatsapp Number" value={whatsappNumber} onChangeText={setWhatsappNumber} keyboardType="phone-pad" style={styles.input} placeholderTextColor={COLORS.textPrimary} />
+            <TextInput placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" style={styles.input} placeholderTextColor={COLORS.textPrimary} />
+            <TextInput placeholder="Cow Rate*" value={cowRate} onChangeText={setCowRate} keyboardType="numeric" style={styles.input} placeholderTextColor={COLORS.textPrimary} />
+            <TextInput placeholder="Buffalo Rate*" value={buffaloRate} onChangeText={setBuffaloRate} keyboardType="numeric" style={styles.input} placeholderTextColor={COLORS.textPrimary} />
 
-            {/* Footer Buttons */}
             <View style={styles.footer}>
-              <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: COLORS.border }]}
-                onPress={onClose}
-              >
+              <TouchableOpacity style={[styles.submitBtn, { backgroundColor: COLORS.border }]} onPress={onClose}>
                 <Text style={[styles.submitBtnText, { color: COLORS.textPrimary }]}>Cancel</Text>
               </TouchableOpacity>
+
               <TouchableOpacity style={styles.submitBtn} onPress={handleSave}>
                 <Text style={styles.submitBtnText}>Save</Text>
               </TouchableOpacity>
@@ -186,8 +124,12 @@ const AddCustomerModal = ({ visible, onClose, onSave }) => {
   );
 };
 
-export default AddCustomerModal;
+export default AddCustomerScreen;
 
+// --- Styles same as your original ---
+
+
+// --- Styles ---
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -273,3 +215,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
