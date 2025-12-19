@@ -3,7 +3,10 @@
  const ENDPOINTS = {
   LOGIN: "/Auth/login",
   GET_CUSTOMERS:"/Customer",
-  ADD_CUSTOMER:"/Customer"
+  ADD_CUSTOMER:"/Customer",
+  GET_CUSTOMER_DETAILS:"/MilkEntries/getmilkOnId",
+  ADD_MILK_ENTRY:"/MilkEntries",
+  SEARCH_CUSTOMER:"/Customer/search"
 };
 
 export default { BASE_URL, ENDPOINTS }

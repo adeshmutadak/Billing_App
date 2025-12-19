@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {View, Text, TouchableOpacity, TextInput, FlatList, Image, StyleSheet, Pressable
 } from 'react-native';
-import axios from 'axios';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '../../config';
 import MessageBox from '../../utils/MessageBox';
 import { COLORS, FONTS, SIZES } from '../../utils/theme';
 import AddCustomerScreen from './AddCustomerScreen';
-
+import api from '../../API/axiosConfig'; 
 const defaultCustomerImg = require('../../Assets/Images/logo.jpg');
 
 const CustomerHomeScreen = ({ navigation }) => {
@@ -17,18 +17,20 @@ const CustomerHomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [loggedUser, setLoggedUser] = useState("");
+const [searchText, setSearchText] = useState('');
 
-  const api = axios.create();
+
+  //const api = axios.create();
 
   // Attach token to requests
-  useEffect(() => {
-    api.interceptors.request.use(async (req) => {
-      const token = await AsyncStorage.getItem("token");
-      console.log("token",token)
-      if (token) req.headers.Authorization = `Bearer ${token}`;
-      return req;
-    });
-  }, []);
+  // useEffect(() => {
+  //   api.interceptors.request.use(async (req) => {
+  //     const token = await AsyncStorage.getItem("token");
+  //     console.log("token",token)
+  //     if (token) req.headers.Authorization = `Bearer ${token}`;
+  //     return req;
+  //   });
+  // }, []);
 
   // Fetch logged user first letter
   useEffect(() => {
@@ -41,29 +43,114 @@ const CustomerHomeScreen = ({ navigation }) => {
 
   useEffect(() => { fetchCustomers(); }, []);
 
-  const fetchCustomers = async () => {
-    setLoading(true); 
-    setMessage(null);
-    try {
-      const response = await api.get(`${config.BASE_URL}${config.ENDPOINTS.GET_CUSTOMERS}`);
-      if (response.data.success) setCustomers(response.data.data || []);
-      else setMessage({ type: "error", text: response.data.message || "Failed to load customers" });
-    } catch (error) {
-      console.log("Customer API Error:", error.response?.data || error.message);
-      setMessage({ type: "error", text: "Something went wrong while fetching customers" });
-    } finally { setLoading(false); }
-  };
+const fetchCustomers = async () => {
+  setLoading(true);
+  setMessage(null);
+
+  try {
+    const response = await api.get(config.ENDPOINTS.GET_CUSTOMERS);
+
+    if (response.data.success) {
+      setCustomers(response.data.data || []);
+    } else {
+      setMessage({
+        type: "error",
+        text: response.data.message || "Failed to load customers",
+      });
+    }
+  } catch (error) {
+    console.log("Customer API Error:", error.response?.data || error.message);
+    setMessage({
+      type: "error",
+      text: "Something went wrong while fetching customers",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  // const renderCustomer = ({ item }) => (
+
+    
+  //   <View style={styles.card}>
+  //     <Image source={defaultCustomerImg} style={styles.customerImg} />
+  //     <View style={{ marginLeft: 70 }}>
+  //       <Text style={styles.customerName}>{item.name}</Text>
+  //       <Text style={styles.customerDetails}>{item.phoneNumber}</Text>
+  //       <Text style={styles.customerDetails}>{item.address}</Text>
+  //     </View>
+  //   </View>
+  // );
 
   const renderCustomer = ({ item }) => (
-    <View style={styles.card}>
-      <Image source={defaultCustomerImg} style={styles.customerImg} />
-      <View style={{ marginLeft: 70 }}>
-        <Text style={styles.customerName}>{item.name}</Text>
-        <Text style={styles.customerDetails}>{item.phoneNumber}</Text>
-        <Text style={styles.customerDetails}>{item.address}</Text>
-      </View>
-    </View>
-  );
+  <TouchableOpacity
+    style={styles.card}
+    onPress={() => navigation.navigate('CustomerDetails', { customer: item })}
+  >
+    <Image source={defaultCustomerImg} style={styles.customerImg} />
+    <View style={{ marginLeft: 70, flexShrink: 1 }}>
+  <Text style={styles.customerName}>{item.name}</Text>
+  <Text style={styles.customerDetails}>{item.phoneNumber}</Text>
+  <Text style={[styles.customerDetails, { flexShrink: 1 }]} numberOfLines={2} ellipsizeMode="tail">
+    {item.address}
+  </Text>
+</View>
+
+  </TouchableOpacity>
+);
+
+const searchCustomers = async (searchText) => {
+  if (!searchText.trim()) return;
+
+  setLoading(true);
+  setMessage(null);
+
+  let queryParam = '';
+
+  // Phone number (only digits)
+  if (/^\d+$/.test(searchText)) {
+    queryParam = `phoneNumber=${encodeURIComponent(searchText)}`;
+  } 
+  // Address (contains space or common address chars)
+  else if (searchText.includes(' ') || /[,.-]/.test(searchText)) {
+    queryParam = `address=${encodeURIComponent(searchText)}`;
+  } 
+  // Name
+  else {
+    queryParam = `name=${encodeURIComponent(searchText)}`;
+  }
+
+  try {
+    const response = await api.get(
+      `${config.ENDPOINTS.SEARCH_CUSTOMER}?${queryParam}`
+    );
+
+    if (response.status === 200 && response.data?.data?.length > 0) {
+      setCustomers(response.data.data);
+    } else {
+      setCustomers([]);
+      setMessage({
+        type: 'warning',
+        text: 'No customers found',
+      });
+    }
+  } catch (error) {
+    console.log("Search error:", error.response?.data || error.message);
+    setMessage({
+      type: 'error',
+      text: 'Failed to search customers',
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+
+
 
   return (
     <View style={styles.container}>
@@ -93,7 +180,45 @@ const CustomerHomeScreen = ({ navigation }) => {
 
       {message && <MessageBox type={message.type} message={message.text} />}
 
-      <TextInput placeholder="Search customer..." placeholderTextColor="#777" style={styles.searchBar} />
+   <View style={styles.searchContainer}>
+  <View style={styles.searchInputWrapper}>
+    <TextInput
+      placeholder="Search by name, phone or address"
+      style={styles.searchInput}
+      value={searchText}
+      onChangeText={setSearchText}
+    />
+
+    {searchText.length > 0 && (
+      <TouchableOpacity
+        style={styles.clearIcon}
+        onPress={() => {
+          setSearchText('');
+          fetchCustomers();
+        }}
+      >
+        <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
+      </TouchableOpacity>
+    )}
+  </View>
+
+  <TouchableOpacity
+    style={styles.searchBtn}
+    onPress={() => {
+      if (searchText.trim() === '') {
+        fetchCustomers();
+      } else {
+        searchCustomers(searchText);
+      }
+    }}
+  >
+    <Text style={styles.searchBtnText}>Search</Text>
+  </TouchableOpacity>
+</View>
+
+
+
+
 
       {loading ? <Text style={{ textAlign: 'center', marginTop: 20, fontSize: 16 }}>Loading customers...</Text> :
         <FlatList data={customers} keyExtractor={(item) => item.customerId.toString()} renderItem={renderCustomer} contentContainerStyle={{ paddingBottom: 80 }} />
@@ -216,6 +341,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
     color: COLORS.textSecondary,
     marginTop: 2,
+     flexShrink: 1,
   },
   bottomNav: {
     position: "absolute",
@@ -241,5 +367,45 @@ const styles = StyleSheet.create({
     color: COLORS.background,
     fontSize: 15,
   },
+  searchContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginHorizontal: SIZES.margin,
+  marginBottom: 14,
+},
+
+searchInput: {
+  flex: 1,
+  borderWidth: 1,
+  borderColor: COLORS.border,
+  padding: 12,
+  borderRadius: SIZES.radius,
+  fontFamily: FONTS.regular,
+},
+
+searchBtn: {
+  marginLeft: 8,
+  backgroundColor: COLORS.primary,
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  borderRadius: SIZES.radius,
+},
+
+searchBtnText: {
+  color: COLORS.background,
+  fontFamily: FONTS.bold,
+},
+searchInputWrapper: {
+  flex: 1,
+  position: 'relative',
+},
+
+clearIcon: {
+  position: 'absolute',
+  right: 12,
+  top: '50%',
+  transform: [{ translateY: -10 }],
+},
+
 });
 

@@ -19,6 +19,25 @@ const AddCustomerScreen = ({ visible, onSave, onClose }) => {
   const [buffaloRate, setBuffaloRate] = useState('');
   const [photoBase64, setPhotoBase64] = useState(null);
 
+
+const resetForm = () => {
+  setName('');
+  setAddress('');
+  setPhoneNumber('');
+  setWhatsappNumber('');
+  setEmail('');
+  setCowRate('');
+  setBuffaloRate('');
+  setPhotoBase64(null);
+};
+useEffect(() => {
+  if (visible) {
+    resetForm();
+  }
+}, [visible]);
+
+
+
   useEffect(() => {
     const fetchUserId = async () => {
       const id = await AsyncStorage.getItem('userId');
