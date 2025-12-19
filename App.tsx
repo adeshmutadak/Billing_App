@@ -5,6 +5,8 @@ import LandingScreen from './android/app/src/Screens/Common/LandingScreen';
 import LoginScreen from './android/app/src/Screens/Auth/Login';
 import CustomerScreen from './android/app/src/Screens/Customer/CustomerHomeScreen';
 import AddCustomerScreen from './android/app/src/Screens/Customer/AddCustomerScreen';
+import CustomerDetails from './android/app/src/Screens/Customer/CustomerDetails';
+import GenerateBill from './android/app/src/Screens/Customer/GenerateBill';
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -15,6 +17,8 @@ export default function App() {
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Customer" component={CustomerScreen} options={{ headerShown: false }} />
           <Stack.Screen name="AddCustomerScreen" component={AddCustomerScreen} options={{ headerShown: false }} />
+               <Stack.Screen name="CustomerDetails" component={CustomerDetails} options={{ headerShown: false }} />
+               <Stack.Screen name="GenerateBill" component={GenerateBill} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
