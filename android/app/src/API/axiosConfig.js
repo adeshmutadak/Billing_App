@@ -2,7 +2,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const api = axios.create({
-  baseURL: "https://billingservice-production-60e1.up.railway.app/v1/api", // change base URL
+  baseURL: "https://billing-service-c0c2.onrender.com/v1/api", // change base URL
 });
 
 // Add token to every request
