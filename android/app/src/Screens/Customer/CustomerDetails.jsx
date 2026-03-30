@@ -29,6 +29,18 @@ const CustomerDetails = ({ route, navigation }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [message, setMessage] = useState(null);
 
+// Payment Modal States
+// Payment States
+const [showPaymentModal, setShowPaymentModal] = useState(false);
+const [paymentType, setPaymentType] = useState('UPI');
+const [isPaymentDone, setIsPaymentDone] = useState(true);
+const [paymentDate, setPaymentDate] = useState(new Date());
+const [paymentAmount, setPaymentAmount] = useState('');
+const [remainingAmount, setRemainingAmount] = useState('');
+const [monthlyTotal, setMonthlyTotal] = useState(0);
+const [selectedPayment, setSelectedPayment] = useState(null);
+
+
   // Add Entry Modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [entryDate, setEntryDate] = useState(new Date());
@@ -78,6 +90,35 @@ const CustomerDetails = ({ route, navigation }) => {
     };
     fetchUserId();
   }, []);
+
+//Auto Calculate 
+useEffect(() => {
+  const remaining = monthlyTotal - Number(paymentAmount || 0);
+  setRemainingAmount(remaining >= 0 ? remaining : 0);
+}, [paymentAmount, monthlyTotal]);
+  //for Payment
+useEffect(() => {
+  const selectedMonth = paymentDate.getMonth();
+  const selectedYear = paymentDate.getFullYear();
+
+  const total = milkEntries.reduce((sum, entry) => {
+    const entryDate = new Date(entry.date);
+
+    if (
+      entryDate.getMonth() === selectedMonth &&
+      entryDate.getFullYear() === selectedYear
+    ) {
+      return sum + Number(entry.totalAmount || 0);
+    }
+
+    return sum;
+  }, 0);
+
+  setMonthlyTotal(total);
+}, [paymentDate, milkEntries]);
+
+
+
 
   // Fetch milk entries
   useEffect(() => {
@@ -217,6 +258,77 @@ console.log("Delete milk entry Base URl",deleteUrl);
     year: 'numeric',
   });
 
+//Adding paymment
+const handleAddPayment = async () => {
+  if (!paymentAmount) {
+    alert('Enter payment amount');
+    return;
+  }
+
+  const payload = {
+    customerId: customer.customerId,
+    userId,
+    paymentType,
+    isPaymentDone,
+    date: formatDate(paymentDate),
+    amount: Number(paymentAmount),
+    Remaning: Number(remainingAmount),
+  };
+
+  try {
+    const result=`${config.BASE_URL}${config.ENDPOINTS.ADD_PAYMENT}`;
+    console.log("result add payment" ,result)
+    console.log("result add payment payload" ,payload)
+    const response = await api.post(
+      `${config.BASE_URL}${config.ENDPOINTS.ADD_PAYMENT}`,
+      payload
+    );
+
+    if (response.data.success) {
+      alert('Payment added successfully');
+      setShowPaymentModal(false);
+    } else {
+      alert(response.data.message || 'Payment failed');
+    }
+  } catch (error) {
+    console.error(error);
+    alert('Server error');
+  }
+};
+
+
+//Update Payment API
+const handleUpdatePayment = async () => {
+  if (!selectedPayment) return;
+
+  const payload = {
+    paymentId: selectedPayment.paymentId,
+    customerId: customer.customerId,
+    userId,
+    paymentType,
+    isPaymentDone,
+    date: formatDate(paymentDate),
+    amount: Number(paymentAmount),
+    Remaning: Number(remainingAmount),
+  };
+
+  try {
+    const response = await api.put(
+      `${config.BASE_URL}${config.ENDPOINTS.UPDATE_PAYMENT}/${selectedPayment.paymentId}`,
+      payload
+    );
+
+    if (response.data.success) {
+      alert('Payment updated successfully');
+      setShowPaymentModal(false);
+    } else {
+      alert(response.data.message || 'Update failed');
+    }
+  } catch (error) {
+    console.error(error);
+    alert('Server error');
+  }
+};
   return (
     <ScrollView style={styles.container}>
       {/* Photo */}
@@ -251,6 +363,16 @@ console.log("Delete milk entry Base URl",deleteUrl);
           🧾 Generate Bill
         </Text>
       </View>
+
+      <View style={styles.addButtonContainer}>
+        <Text
+          style={styles.addButton}
+          onPress={() => setShowPaymentModal(true)}
+        >
+          💰 Add Payment
+        </Text>
+      </View>
+
 
       {/* Customer Card */}
       <View style={styles.card}>
@@ -486,6 +608,152 @@ console.log("Delete milk entry Base URl",deleteUrl);
           </View>
         </View>
       </Modal>
+
+      {/* Payment Modal */}
+{/* Payment Modal */}
+{/* Payment Modal */}
+<Modal transparent visible={showPaymentModal} animationType="fade">
+  <View style={styles.centeredModal}>
+    <View style={[styles.centeredContent, { maxHeight: '85%' }]}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+
+        <TouchableOpacity
+          style={styles.crossBtn}
+          onPress={() => setShowPaymentModal(false)}
+        >
+          <Text style={styles.crossText}>✕</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.modalTitle}>Add / Update Payment</Text>
+
+        {/* Date */}
+        <TouchableOpacity
+          style={styles.datePickerBtn}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <Text style={styles.dateText}>
+            {paymentDate.toLocaleDateString('en-GB')}
+          </Text>
+        </TouchableOpacity>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={paymentDate}
+            mode="date"
+            display="default"
+            onChange={(e, d) => {
+              setShowDatePicker(false);
+              if (d) setPaymentDate(d);
+            }}
+          />
+        )}
+
+        {/* Payment Type */}
+        <Text style={styles.inputLabel}>Payment Type</Text>
+        <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+          {['UPI', 'Cash', 'Card'].map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={{
+                flex: 1,
+                padding: 8,
+                backgroundColor:
+                  paymentType === type ? COLORS.primary : COLORS.border,
+                marginHorizontal: 3,
+                borderRadius: 6,
+              }}
+              onPress={() => setPaymentType(type)}
+            >
+              <Text
+                style={{
+                  textAlign: 'center',
+                  color:
+                    paymentType === type
+                      ? COLORS.background
+                      : COLORS.textPrimary,
+                }}
+              >
+                {type}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Payment Done */}
+        <Text style={styles.inputLabel}>Payment Done?</Text>
+        <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+          <TouchableOpacity
+            style={[
+              styles.saveBtn,
+              { backgroundColor: isPaymentDone ? COLORS.primary : COLORS.border },
+            ]}
+            onPress={() => setIsPaymentDone(true)}
+          >
+            <Text style={styles.btnText}>Yes</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.cancelBtn,
+              {
+                backgroundColor: !isPaymentDone
+                  ? COLORS.primary
+                  : COLORS.border,
+                marginLeft: 5,
+              },
+            ]}
+            onPress={() => setIsPaymentDone(false)}
+          >
+            <Text style={styles.btnText}>No</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Monthly Total */}
+        <Text style={styles.inputLabel}>Total (Monthly)</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: '#f2f2f2' }]}
+          value={String(monthlyTotal)}
+          editable={false}
+        />
+
+        {/* Amount */}
+        <Text style={styles.inputLabel}>Amount</Text>
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          value={paymentAmount}
+          onChangeText={setPaymentAmount}
+        />
+
+        {/* Remaining */}
+        <Text style={styles.inputLabel}>Remaining</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: '#f2f2f2' }]}
+          value={String(remainingAmount)}
+          editable={false}
+        />
+
+        {/* Buttons */}
+        <View style={{ flexDirection: 'row', marginTop: 10 }}>
+          <TouchableOpacity
+            style={[styles.saveBtn, { marginRight: 5 }]}
+            onPress={handleAddPayment}
+          >
+            <Text style={styles.btnText}>Save Payment</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.cancelBtn, { marginLeft: 5 }]}
+            onPress={handleUpdatePayment}
+          >
+            <Text style={styles.btnText}>Update Payment</Text>
+          </TouchableOpacity>
+        </View>
+
+      </ScrollView>
+    </View>
+  </View>
+</Modal>
     </ScrollView>
   );
 };
