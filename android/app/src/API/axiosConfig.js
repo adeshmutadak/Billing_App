@@ -1,18 +1,19 @@
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import config from '../config';
 
 const api = axios.create({
-  baseURL: "https://billing-service-c0c2.onrender.com/v1/api", // change base URL
+  baseURL: config.BASE_URL,
+  timeout: 15000,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Add token to every request
-api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem("token");
-  
+api.interceptors.request.use(async requestConfig => {
+  const token = await AsyncStorage.getItem('token');
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    requestConfig.headers.Authorization = `Bearer ${token}`;
   }
-  return config;
+  return requestConfig;
 });
 
 export default api;
