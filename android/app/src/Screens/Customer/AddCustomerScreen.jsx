@@ -4,11 +4,13 @@ import {
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import api from '../../API/axiosConfig';
 import config from '../../config';
+import { useToast } from '../../components/Toast';
 import { COLORS, FONTS, SIZES } from '../../utils/theme';
 
 const AddCustomerScreen = ({ visible, onSave, onClose }) => {
+  const toast = useToast();
   const [userId, setUserId] = useState(null);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -51,7 +53,7 @@ useEffect(() => {
       { mediaType: 'photo', includeBase64: true, maxWidth: 500, maxHeight: 500, quality: 0.7 },
       (response) => {
         if (response.didCancel) return;
-        if (response.errorCode) return Alert.alert('Error', response.errorMessage);
+        if (response.errorCode) return toast.error(response.errorMessage);
         if (response.assets && response.assets.length > 0) setPhotoBase64(response.assets[0].base64);
       }
     );
@@ -59,11 +61,11 @@ useEffect(() => {
 
   const handleSave = async () => {
     if (!name || !address || !phoneNumber || !cowRate || !buffaloRate) {
-      Alert.alert("Error", "Please fill all required fields");
+      toast.error('Please fill all required fields');
       return;
     }
     if (!userId) {
-      Alert.alert("Error", "User ID not found");
+      toast.error('User ID not found');
       return;
     }
 
@@ -80,22 +82,17 @@ useEffect(() => {
     };
 
     try {
-      const token = await AsyncStorage.getItem('token');
-      const response = await axios.post(
-        `${config.BASE_URL}${config.ENDPOINTS.ADD_CUSTOMER}`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+          const response = await api.post(config.ENDPOINTS.ADD_CUSTOMER, payload);
 
       if (response.data.success) {
-        Alert.alert("Success", "Customer added successfully!");
+        toast.success('Customer added successfully!');
         onSave?.(); // trigger callback to refresh customer list
       } else {
-        Alert.alert("Error", response.data.message || "Failed to add customer");
+        toast.error(response.data.message || "Failed to add customer");
       }
     } catch (error) {
       console.log("Add Customer API Error:", error.response?.data || error.message);
-      Alert.alert("Error", "Something went wrong");
+      toast.error('Something went wrong');
     }
   };
 

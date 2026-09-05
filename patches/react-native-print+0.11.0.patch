@@ -1,0 +1,43 @@
+diff --git a/node_modules/react-native-print/android/build.gradle b/node_modules/react-native-print/android/build.gradle
+index 34e2591..2778c8c 100644
+--- a/node_modules/react-native-print/android/build.gradle
++++ b/node_modules/react-native-print/android/build.gradle
+@@ -1,20 +1,18 @@
+ apply plugin: 'com.android.library'
+ 
++def safeExtGet(prop, fallback) {
++    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
++}
++
+ android {
+-    buildToolsVersion = "31.0.0"
++    namespace "com.christopherdro.RNPrint"
++    compileSdk safeExtGet('compileSdkVersion', 36)
+ 
+     defaultConfig {
+-        minSdkVersion = 21
+-        compileSdkVersion = 31
+-        targetSdkVersion 29
+-        versionCode 1
+-        versionName "1.0"
+-        ndk {
+-            abiFilters "armeabi-v7a", "x86"
+-        }
++        minSdkVersion safeExtGet('minSdkVersion', 24)
+     }
+ }
+ 
+ dependencies {
+-    implementation "com.facebook.react:react-native:+" // From node_modules
++    implementation "com.facebook.react:react-android"
+ }
+diff --git a/node_modules/react-native-print/android/src/main/AndroidManifest.xml b/node_modules/react-native-print/android/src/main/AndroidManifest.xml
+index fed80c2..94cbbcf 100644
+--- a/node_modules/react-native-print/android/src/main/AndroidManifest.xml
++++ b/node_modules/react-native-print/android/src/main/AndroidManifest.xml
+@@ -1,4 +1 @@
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-          package="com.christopherdro.RNPrint">
+-
+-</manifest>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

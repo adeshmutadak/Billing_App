@@ -117,3 +117,6 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Bundles the react-native-vector-icons font files (Ionicons, etc.) into the APK.
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")

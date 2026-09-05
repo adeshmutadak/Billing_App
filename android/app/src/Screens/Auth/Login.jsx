@@ -1,32 +1,30 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Image, StyleSheet, TouchableOpacity } from 'react-native';
-import axios from 'axios';
+import api from '../../API/axiosConfig';
 import config from '../../config'; // Make sure this path is correct
-import MessageBox from '../../utils/MessageBox'; // Reusable message box
+import { useToast } from '../../components/Toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Login({ navigation }) {
   const [emailOrMobile, setEmailOrMobile] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(null); // { type: 'success'|'error'|'warning', text: string }
+  const toast = useToast();
 
   const handleLogin = async () => {
     // ✅ Fix validation
     if (!emailOrMobile || !password) {
-      setMessage({ type: 'warning', text: 'Please enter both Email/Phone and Password' });
+      toast.warning('Please enter both Email/Phone and Password');
       return;
     }
 
     setLoading(true);
-    setMessage(null);
 
-    const url = `${config.BASE_URL}${config.ENDPOINTS.LOGIN}`;
-    console.log('Login URL:', url);
+    console.log('Login URL:', `${config.BASE_URL}${config.ENDPOINTS.LOGIN}`);
     console.log('Request Payload:', { emailOrMobile, password });
 
     try {
-      const response = await axios.post(url, { emailOrMobile, password });
+            const response = await api.post(config.ENDPOINTS.LOGIN, { emailOrMobile, password });
       console.log('Login Response:', response);
 
       if (response.data.success) {
@@ -41,20 +39,17 @@ export default function Login({ navigation }) {
         console.log(response.data);
         console.log(userName);
          console.log("User Id",userId);
-        setMessage({
-          type: 'success',
-          text: `Welcome ${userName}! Login successful 🎉`,
-        });
+        toast.success(`Welcome ${userName}! Login successful 🎉`);
         // Redirect to Customer screen after 1 second
         setTimeout(() => {
           navigation.replace('Customer'); // make sure 'Customer' is registered in your navigator
         }, 1000);
       } else {
-        setMessage({ type: 'error', text: response.data.message || 'Login failed' });
+        toast.error(response.data.message || 'Login failed');
       }
     } catch (error) {
       console.error('Login Error:', error.response?.data || error.message);
-      setMessage({ type: 'error', text: 'Something went wrong. Please try again!' });
+      toast.error('Something went wrong. Please try again!');
     } finally {
       setLoading(false);
     }
@@ -73,7 +68,6 @@ export default function Login({ navigation }) {
       <Text style={styles.title}>Login</Text>
 
       {/* Message Box */}
-      {message && <MessageBox type={message.type} message={message.text} />}
 
       {/* Email / Phone Input */}
       <TextInput

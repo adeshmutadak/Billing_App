@@ -1,165 +1,221 @@
-import React, { useState, useEffect } from 'react';
-import {View, Text, TouchableOpacity, TextInput, FlatList, Image, StyleSheet, Pressable
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  TextInput,
+  FlatList,
+  Image,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Modal,
+  RefreshControl,
+  Keyboard,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import RNPrint from 'react-native-print';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import config from '../../config';
-import MessageBox from '../../utils/MessageBox';
+import { useToast } from '../../components/Toast';
+import { allCustomersBillHtml, withPhotos } from '../../utils/billHtml';
 import { COLORS, FONTS, SIZES } from '../../utils/theme';
 import AddCustomerScreen from './AddCustomerScreen';
-import api from '../../API/axiosConfig'; 
+import {
+  MONTHS,
+  STATUS_COLORS,
+  statusLabel,
+  photoSource,
+  money,
+  fetchBillHistory,
+} from '../../API/billHistory';
+
 const defaultCustomerImg = require('../../Assets/Images/logo.jpg');
 
+// Filters on paymentStatus rather than the isPaid boolean, so a part paid
+// month is not lumped in with the ones nothing has been received for.
+const STATUS_FILTERS = [
+  { value: null, label: 'All' },
+  { value: 'Paid', label: 'Paid' },
+  { value: 'Partial', label: 'Part paid' },
+  { value: 'Unpaid', label: 'Unpaid' },
+];
+
+const MAX_SUGGESTIONS = 8;
+
+const normalize = value => String(value ?? '').toLowerCase();
+
 const CustomerHomeScreen = ({ navigation }) => {
+  const now = new Date();
+
+  // The home screen is always the current year. The history screen is the same
+  // screen logic against a past year, through the same endpoint.
+  const year = now.getFullYear();
+
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [statusFilter, setStatusFilter] = useState(null);
+
+  const [customers, setCustomers] = useState([]);
+  const [message, setMessage] = useState(null);
+  const toast = useToast();
+
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [printingAll, setPrintingAll] = useState(false);
+
+  const [searchText, setSearchText] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [loggedUser, setLoggedUser] = useState("");
-const [searchText, setSearchText] = useState('');
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const [loggedUser, setLoggedUser] = useState('');
 
-
-  //const api = axios.create();
-
-  // Attach token to requests
-  // useEffect(() => {
-  //   api.interceptors.request.use(async (req) => {
-  //     const token = await AsyncStorage.getItem("token");
-  //     console.log("token",token)
-  //     if (token) req.headers.Authorization = `Bearer ${token}`;
-  //     return req;
-  //   });
-  // }, []);
-
-  // Fetch logged user first letter
   useEffect(() => {
     const fetchUserName = async () => {
-      const name = await AsyncStorage.getItem("userName");
-      if (name) setLoggedUser(name.charAt(0).toUpperCase());
+      const name = await AsyncStorage.getItem('userName');
+      if (name) {
+        setLoggedUser(name.charAt(0).toUpperCase());
+      }
     };
     fetchUserName();
   }, []);
 
-  useEffect(() => { fetchCustomers(); }, []);
-
-const fetchCustomers = async () => {
-  setLoading(true);
-  setMessage(null);
-
-  try {
-    const response = await api.get(config.ENDPOINTS.GET_CUSTOMERS);
-
-    if (response.data.success) {
-      setCustomers(response.data.data || []);
-    } else {
-      setMessage({
-        type: "error",
-        text: response.data.message || "Failed to load customers",
-      });
-    }
-  } catch (error) {
-    console.log("Customer API Error:", error.response?.data || error.message);
-    setMessage({
-      type: "error",
-      text: "Something went wrong while fetching customers",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-  // const renderCustomer = ({ item }) => (
-
-    
-  //   <View style={styles.card}>
-  //     <Image source={defaultCustomerImg} style={styles.customerImg} />
-  //     <View style={{ marginLeft: 70 }}>
-  //       <Text style={styles.customerName}>{item.name}</Text>
-  //       <Text style={styles.customerDetails}>{item.phoneNumber}</Text>
-  //       <Text style={styles.customerDetails}>{item.address}</Text>
-  //     </View>
-  //   </View>
-  // );
-
-  const renderCustomer = ({ item }) => (
-  <TouchableOpacity
-    style={styles.card}
-    onPress={() => navigation.navigate('CustomerDetails', { customer: item })}
-  >
-    <Image source={defaultCustomerImg} style={styles.customerImg} />
-    <View style={{ marginLeft: 70, flexShrink: 1 }}>
-  <Text style={styles.customerName}>{item.name}</Text>
-  <Text style={styles.customerDetails}>{item.phoneNumber}</Text>
-  <Text style={[styles.customerDetails, { flexShrink: 1 }]} numberOfLines={2} ellipsizeMode="tail">
-    {item.address}
-  </Text>
-</View>
-
-  </TouchableOpacity>
-);
-
-const searchCustomers = async (searchText) => {
-  if (!searchText.trim()) return;
-
-  setLoading(true);
-  setMessage(null);
-
-  let queryParam = '';
-
-  // Phone number (only digits)
-  if (/^\d+$/.test(searchText)) {
-    queryParam = `phoneNumber=${encodeURIComponent(searchText)}`;
-  } 
-  // Address (contains space or common address chars)
-  else if (searchText.includes(' ') || /[,.-]/.test(searchText)) {
-    queryParam = `address=${encodeURIComponent(searchText)}`;
-  } 
-  // Name
-  else {
-    queryParam = `name=${encodeURIComponent(searchText)}`;
-  }
-
-  try {
-    const response = await api.get(
-      `${config.ENDPOINTS.SEARCH_CUSTOMER}?${queryParam}`
-    );
-
-    if (response.status === 200 && response.data?.data?.length > 0) {
-      setCustomers(response.data.data);
-    } else {
+  // One request for the whole year. Month, status and search are applied
+  // locally, so every filter tap is instant.
+  const loadYear = useCallback(async () => {
+    try {
+      const result = await fetchBillHistory({ year, includeDetail: true });
+      setCustomers(result.customers);
+      setMessage(result.message);
+    } catch (err) {
       setCustomers([]);
-      setMessage({
-        type: 'warning',
-        text: 'No customers found',
-      });
+      setMessage(null);
+      toast.error('Could not load customers');
     }
-  } catch (error) {
-    console.log("Search error:", error.response?.data || error.message);
-    setMessage({
-      type: 'error',
-      text: 'Failed to search customers',
+  }, [year]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      await loadYear();
+      if (!cancelled) {
+        setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadYear]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadYear();
+    setRefreshing(false);
+  };
+
+  // One row per customer for the selected month.
+  const rows = useMemo(() => {
+    const needle = searchText.trim().toLowerCase();
+
+    return customers
+      .map(customer => {
+        const monthData = (customer.months ?? []).find(m => m.month === month);
+        return {
+          customer,
+          month: monthData ?? null,
+          status: monthData?.paymentStatus ?? 'NoActivity',
+          totalAmount: Number(monthData?.totalAmount ?? 0),
+          remainingAmount: Number(monthData?.remainingAmount ?? 0),
+          isPaid: !!monthData?.isPaid,
+        };
+      })
+      .filter(row => {
+        if (statusFilter !== null && row.status !== statusFilter) {
+          return false;
+        }
+
+        if (!needle) {
+          return true;
+        }
+
+        const c = row.customer;
+        return (
+          normalize(c.name).includes(needle) ||
+          normalize(c.phoneNumber).includes(needle) ||
+          normalize(c.address).includes(needle)
+        );
+      });
+  }, [customers, month, statusFilter, searchText]);
+
+  // The whole year is already loaded, so search needs no request.
+  const suggestions = useMemo(() => {
+    if (!searchText.trim()) {
+      return [];
+    }
+    return rows.slice(0, MAX_SUGGESTIONS);
+  }, [rows, searchText]);
+
+  const monthLabel = MONTHS.find(m => m.value === month)?.label ?? '';
+
+  // Every customer's bill for the selected month in one print job, four to an
+  // A4 sheet. The year is already loaded with includeDetail, so each month
+  // carries its own days and no extra request is needed.
+  const printAllBills = async () => {
+    const withEntries = customers.filter(c => {
+      const m = (c.months ?? []).find(x => x.month === month);
+      return (m?.days ?? []).some(d => d.entryId != null);
     });
-  } finally {
-    setLoading(false);
-  }
-};
 
+    if (withEntries.length === 0) {
+      toast.warning(`No customer has entries for ${monthLabel} ${year}`);
+      return;
+    }
 
+    setPrintingAll(true);
+    try {
+      await RNPrint.print({
+        // Photos are downloaded and inlined in parallel first; one that fails
+        // is simply omitted rather than blocking the whole job.
+        html: allCustomersBillHtml({
+          customers: await withPhotos(withEntries),
+          month,
+          year,
+        }),
+        fileName: `Bills_${monthLabel}_${year}`,
+        jobName: `Milk bills ${monthLabel} ${year}`,
+      });
+    } catch (err) {
+      console.log('[PrintAll] failed', err);
+      toast.error('Could not print the bills');
+    } finally {
+      setPrintingAll(false);
+    }
+  };
 
+  const openCustomer = customer => {
+    setShowSuggestions(false);
+    Keyboard.dismiss();
+    // The customer object carries customerId, name, phoneNumber, cowRate and
+    // buffaloRate, which is everything CustomerDetails needs.
+    navigation.navigate('CustomerDetails', { customer });
+  };
 
-
-
+  const keyOf = (item, index) => String(item?.customer?.customerId ?? index);
 
   return (
     <View style={styles.container}>
-      {menuVisible && <Pressable style={styles.overlay} onPress={() => setMenuVisible(false)} />}
+      {menuVisible && (
+        <Pressable style={styles.overlay} onPress={() => setMenuVisible(false)} />
+      )}
 
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => setMenuVisible(!menuVisible)}>
-          <Text style={styles.hamburger}>☰</Text>
+          <Text style={styles.hamburger}>&#9776;</Text>
         </TouchableOpacity>
+        <Text style={styles.yearLabel}>{year}</Text>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{loggedUser}</Text>
         </View>
@@ -167,77 +223,256 @@ const searchCustomers = async (searchText) => {
 
       {menuVisible && (
         <View style={styles.menuBox}>
-          <TouchableOpacity style={styles.menuItem}><Text style={styles.menuText}>Profile</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}><Text style={styles.menuText}>History</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem} onPress={async () => { 
-            await AsyncStorage.removeItem("token"); 
-            setMessage({ type: "success", text: "Logged out successfully!" }); 
-          }}>
-            <Text style={[styles.menuText, { color: "red" }]}>Logout</Text>
+          <TouchableOpacity style={styles.menuItem}>
+            <Text style={styles.menuText}>Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              setMenuVisible(false);
+              navigation.navigate('History');
+            }}
+          >
+            <Text style={styles.menuText}>History</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={async () => {
+              await AsyncStorage.removeItem('token');
+              toast.success('Logged out successfully');
+            }}
+          >
+            <Text style={[styles.menuText, { color: 'red' }]}>Logout</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {message && <MessageBox type={message.type} message={message.text} />}
 
-   <View style={styles.searchContainer}>
-  <View style={styles.searchInputWrapper}>
-    <TextInput
-      placeholder="Search by name, phone or address"
-      style={styles.searchInput}
-      value={searchText}
-      onChangeText={setSearchText}
-    />
+      {/* Search */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputWrapper}>
+          <Ionicons
+            name="search"
+            size={18}
+            color={COLORS.textSecondary}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            placeholder="Search by name, phone or address"
+            placeholderTextColor={COLORS.textSecondary}
+            style={styles.searchInput}
+            value={searchText}
+            onChangeText={text => {
+              setSearchText(text);
+              setShowSuggestions(text.trim().length > 0);
+            }}
+            onFocus={() => setShowSuggestions(searchText.trim().length > 0)}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
 
-    {searchText.length > 0 && (
-      <TouchableOpacity
-        style={styles.clearIcon}
-        onPress={() => {
-          setSearchText('');
-          fetchCustomers();
-        }}
-      >
-        <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
-      </TouchableOpacity>
-    )}
-  </View>
+          {searchText.length > 0 && (
+            <TouchableOpacity
+              style={styles.trailingIcon}
+              onPress={() => {
+                setSearchText('');
+                setShowSuggestions(false);
+              }}
+            >
+              <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          )}
 
-  <TouchableOpacity
-    style={styles.searchBtn}
-    onPress={() => {
-      if (searchText.trim() === '') {
-        fetchCustomers();
-      } else {
-        searchCustomers(searchText);
-      }
-    }}
-  >
-    <Text style={styles.searchBtnText}>Search</Text>
-  </TouchableOpacity>
-</View>
+          {showSuggestions && (
+            <View style={styles.suggestionBox}>
+              {suggestions.length === 0 ? (
+                <Text style={styles.suggestionEmpty}>No matches</Text>
+              ) : (
+                <FlatList
+                  data={suggestions}
+                  keyExtractor={keyOf}
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.suggestionItem}
+                      onPress={() => openCustomer(item.customer)}
+                    >
+                      <Text style={styles.suggestionName} numberOfLines={1}>
+                        {item.customer.name}
+                      </Text>
+                      <Text style={styles.suggestionMeta} numberOfLines={1}>
+                        {[item.customer.phoneNumber, item.customer.address]
+                          .filter(Boolean)
+                          .join(' - ')}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              )}
+            </View>
+          )}
+        </View>
+      </View>
 
+      {/* Month and payment filters, the same set the history screen uses */}
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={styles.monthPill}
+          onPress={() => setMonthPickerOpen(true)}
+        >
+          <Text style={styles.monthPillText}>{monthLabel}</Text>
+          <Ionicons name="chevron-down" size={16} color={COLORS.primary} />
+        </TouchableOpacity>
 
+        {STATUS_FILTERS.map(option => {
+          const active = statusFilter === option.value;
+          return (
+            <TouchableOpacity
+              key={String(option.value)}
+              style={[styles.statusChip, active && styles.statusChipActive]}
+              onPress={() => setStatusFilter(option.value)}
+            >
+              <Text
+                style={[styles.statusChipText, active && styles.statusChipTextActive]}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={rows}
+          keyExtractor={keyOf}
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={() => setShowSuggestions(false)}
+          contentContainerStyle={{ paddingBottom: 90 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>
+              {customers.length === 0
+                ? message || `No customers for ${year}`
+                : `No customers match this filter for ${monthLabel}`}
+            </Text>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => openCustomer(item.customer)}
+            >
+              <Image
+                source={photoSource(item.customer.photoUrl, defaultCustomerImg)}
+                style={styles.customerImg}
+              />
 
+              <View style={styles.cardBody}>
+                <Text style={styles.customerName} numberOfLines={1}>
+                  {item.customer.name}
+                </Text>
+                <Text style={styles.customerDetails} numberOfLines={1}>
+                  {item.customer.phoneNumber}
+                </Text>
+                <Text style={styles.customerDetails} numberOfLines={2}>
+                  {item.customer.address}
+                </Text>
+              </View>
 
-      {loading ? <Text style={{ textAlign: 'center', marginTop: 20, fontSize: 16 }}>Loading customers...</Text> :
-        <FlatList data={customers} keyExtractor={(item) => item.customerId.toString()} renderItem={renderCustomer} contentContainerStyle={{ paddingBottom: 80 }} />
-      }
+              <View style={styles.cardRight}>
+                <Text style={styles.cardAmount}>{money(item.totalAmount)}</Text>
+                <View
+                  style={[
+                    styles.statusPill,
+                    { backgroundColor: STATUS_COLORS[item.status] },
+                  ]}
+                >
+                  <Text style={styles.statusPillText}>
+                    {statusLabel(item.status)}
+                  </Text>
+                </View>
+                {item.remainingAmount > 0 && (
+                  <Text style={styles.cardDue}>
+                    {money(item.remainingAmount)} due
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
 
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navBtn}><Text style={styles.navText}>Home</Text></TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.navBtn, printingAll && styles.navBtnBusy]}
+          disabled={printingAll}
+          onPress={printAllBills}
+        >
+          <Text style={styles.navText}>
+            {printingAll ? 'Preparing...' : `Print ${monthLabel} bills`}
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.navBtn} onPress={() => setShowAddModal(true)}>
           <Text style={styles.navText}>Add Customer</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Add Customer Modal */}
+      {/* Month picker */}
+      <Modal
+        visible={monthPickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMonthPickerOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.pickerOverlay}
+          activeOpacity={1}
+          onPress={() => setMonthPickerOpen(false)}
+        >
+          <View style={styles.pickerCard}>
+            <Text style={styles.pickerTitle}>Select month</Text>
+            <ScrollView>
+              {MONTHS.map(option => {
+                const active = month === option.value;
+                return (
+                  <TouchableOpacity
+                    key={String(option.value)}
+                    style={styles.pickerRow}
+                    onPress={() => {
+                      setMonth(option.value);
+                      setMonthPickerOpen(false);
+                    }}
+                  >
+                    <Text
+                      style={[styles.pickerRowText, active && styles.pickerRowActive]}
+                    >
+                      {option.label}
+                    </Text>
+                    {active && (
+                      <Ionicons name="checkmark" size={18} color={COLORS.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <AddCustomerScreen
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSave={() => {
-          setShowAddModal(false); // Close modal
-          fetchCustomers();        // Refresh customer list
+          setShowAddModal(false);
+          loadYear();
         }}
       />
     </View>
@@ -246,27 +481,31 @@ const searchCustomers = async (searchText) => {
 
 export default CustomerHomeScreen;
 
-// --- Styles (same as your original)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   overlay: {
-    position: "absolute",
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: 'rgba(0,0,0,0.3)',
     zIndex: 1,
   },
   topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: SIZES.padding,
     paddingVertical: 20,
-    alignItems: "center",
   },
   hamburger: {
     fontSize: 30,
@@ -274,13 +513,18 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     zIndex: 2,
   },
+  yearLabel: {
+    fontSize: 18,
+    fontFamily: FONTS.bold,
+    color: COLORS.primary,
+  },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 50,
     backgroundColor: COLORS.primary,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatarText: {
     color: COLORS.background,
@@ -288,7 +532,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
   },
   menuBox: {
-    position: "absolute",
+    position: 'absolute',
     top: 65,
     left: 15,
     width: 150,
@@ -307,18 +551,121 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.medium,
     color: COLORS.textPrimary,
   },
-  searchBar: {
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SIZES.margin,
+    zIndex: 20,
+  },
+  searchInputWrapper: {
+    flex: 1,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: 12,
+    zIndex: 1,
+  },
+  searchInput: {
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 12,
+    paddingVertical: 12,
+    paddingLeft: 38,
+    paddingRight: 40,
     borderRadius: SIZES.radius,
-    marginHorizontal: SIZES.margin,
-    marginBottom: 14,
     fontFamily: FONTS.regular,
+    color: COLORS.textPrimary,
+    backgroundColor: COLORS.background,
+  },
+  trailingIcon: {
+    position: 'absolute',
+    right: 12,
+  },
+  suggestionBox: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    maxHeight: 260,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: SIZES.radius,
+    elevation: 8,
+    zIndex: 30,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  suggestionName: {
+    fontSize: 15,
+    fontFamily: FONTS.medium,
+    color: COLORS.textPrimary,
+  },
+  suggestionMeta: {
+    fontSize: 12,
+    fontFamily: FONTS.regular,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  suggestionEmpty: {
+    padding: 14,
+    fontSize: 13,
+    fontFamily: FONTS.regular,
+    color: COLORS.textSecondary,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SIZES.margin,
+    marginTop: 12,
+    marginBottom: 10,
+  },
+  monthPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginRight: 10,
+  },
+  monthPillText: {
+    fontSize: 12,
+    fontFamily: FONTS.bold,
+    color: COLORS.primary,
+    marginRight: 4,
+  },
+  statusChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginRight: 8,
+  },
+  statusChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  statusChipText: {
+    fontSize: 12,
+    fontFamily: FONTS.medium,
+    color: COLORS.textPrimary,
+  },
+  statusChipTextActive: {
+    color: COLORS.background,
   },
   card: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.background,
     borderRadius: SIZES.radius,
     marginHorizontal: SIZES.margin,
@@ -331,6 +678,10 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
   },
+  cardBody: {
+    flex: 1,
+    marginLeft: 14,
+  },
   customerName: {
     fontSize: 16,
     fontFamily: FONTS.bold,
@@ -341,19 +692,54 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.regular,
     color: COLORS.textSecondary,
     marginTop: 2,
-     flexShrink: 1,
+  },
+  cardRight: {
+    alignItems: 'flex-end',
+    marginLeft: 8,
+  },
+  cardAmount: {
+    fontSize: 14,
+    fontFamily: FONTS.bold,
+    color: COLORS.textPrimary,
+  },
+  statusPill: {
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  statusPillText: {
+    color: COLORS.background,
+    fontSize: 10,
+    fontFamily: FONTS.medium,
+  },
+  cardDue: {
+    marginTop: 4,
+    fontSize: 11,
+    fontFamily: FONTS.regular,
+    color: STATUS_COLORS.Unpaid,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 40,
+    marginHorizontal: SIZES.margin,
+    fontFamily: FONTS.regular,
+    color: COLORS.textSecondary,
   },
   bottomNav: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 0,
-    width: "100%",
+    width: '100%',
     backgroundColor: COLORS.background,
-    flexDirection: "row",
-    justifyContent: "space-around",
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     paddingVertical: 14,
     borderTopWidth: 1,
     borderColor: COLORS.border,
     elevation: 10,
+  },
+  navBtnBusy: {
+    backgroundColor: '#B0B7C3',
   },
   navBtn: {
     backgroundColor: COLORS.primary,
@@ -367,45 +753,41 @@ const styles = StyleSheet.create({
     color: COLORS.background,
     fontSize: 15,
   },
-  searchContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginHorizontal: SIZES.margin,
-  marginBottom: 14,
-},
-
-searchInput: {
-  flex: 1,
-  borderWidth: 1,
-  borderColor: COLORS.border,
-  padding: 12,
-  borderRadius: SIZES.radius,
-  fontFamily: FONTS.regular,
-},
-
-searchBtn: {
-  marginLeft: 8,
-  backgroundColor: COLORS.primary,
-  paddingHorizontal: 16,
-  paddingVertical: 12,
-  borderRadius: SIZES.radius,
-},
-
-searchBtnText: {
-  color: COLORS.background,
-  fontFamily: FONTS.bold,
-},
-searchInputWrapper: {
-  flex: 1,
-  position: 'relative',
-},
-
-clearIcon: {
-  position: 'absolute',
-  right: 12,
-  top: '50%',
-  transform: [{ translateY: -10 }],
-},
-
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+  },
+  pickerCard: {
+    backgroundColor: COLORS.background,
+    borderRadius: SIZES.radius,
+    maxHeight: '60%',
+    paddingVertical: 12,
+  },
+  pickerTitle: {
+    fontSize: 15,
+    fontFamily: FONTS.bold,
+    color: COLORS.textPrimary,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  pickerRowText: {
+    fontSize: 14,
+    fontFamily: FONTS.regular,
+    color: COLORS.textPrimary,
+  },
+  pickerRowActive: {
+    fontFamily: FONTS.bold,
+    color: COLORS.primary,
+  },
 });
-
