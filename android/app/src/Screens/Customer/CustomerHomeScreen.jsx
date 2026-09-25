@@ -215,8 +215,17 @@ const CustomerHomeScreen = ({ navigation }) => {
         <Pressable style={styles.overlay} onPress={() => setMenuVisible(false)} />
       )}
 
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => setMenuVisible(!menuVisible)}>
+         <View style={styles.topBar}>
+        <TouchableOpacity
+          onPress={() => {
+            const next = !menuVisible;
+            setMenuVisible(next);
+            if (next) {
+              setShowSuggestions(false);
+              Keyboard.dismiss();
+            }
+          }}
+        >
           <Text style={styles.hamburger}>&#9776;</Text>
         </TouchableOpacity>
         <Text style={styles.yearLabel}>{year}</Text>
@@ -239,11 +248,29 @@ const CustomerHomeScreen = ({ navigation }) => {
           >
             <Text style={styles.menuText}>History</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+                    <TouchableOpacity
             style={styles.menuItem}
             onPress={async () => {
-              await AsyncStorage.removeItem('token');
+              setMenuVisible(false);
+
+              // Best effort: the session ends on this device whether or not the
+              // call succeeds, so a network failure must not trap the user in
+              // a logged-in screen.
+              try {
+                await api.post(config.ENDPOINTS.LOGOUT);
+              } catch (err) {
+                console.log('[Logout] server call failed', err?.message);
+              }
+
+              await AsyncStorage.multiRemove(['token', 'userName', 'userId']);
               toast.success('Logged out successfully');
+
+              // reset, not navigate: it clears the stack so the hardware back
+              // button cannot return to the customer list after logging out.
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
             }}
           >
             <Text style={[styles.menuText, { color: 'red' }]}>Logout</Text>
@@ -524,7 +551,10 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.3)',
-    zIndex: 1,
+    // Above the search bar (20) and its suggestion list (30), so a tap
+    // anywhere dimmed closes the menu instead of landing in the input.
+    zIndex: 40,
+    elevation: 10,
   },
   topBar: {
     flexDirection: 'row',
@@ -565,8 +595,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingVertical: 10,
     borderRadius: 10,
-    elevation: 5,
-    zIndex: 3,
+    // Must outrank the search bar, which sits directly underneath it.
+    // Android weighs elevation as well as zIndex, so both are raised.
+    elevation: 12,
+    zIndex: 50,
   },
   menuItem: {
     paddingVertical: 12,

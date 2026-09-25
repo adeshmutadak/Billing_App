@@ -15,6 +15,7 @@ const BRAND = {
 
 const ENDPOINTS = {
   LOGIN: "/Auth/login",
+   LOGOUT: "/Auth/logout",
   GET_CUSTOMERS: "/Customer",
   ADD_CUSTOMER: "/Customer",
   GET_CUSTOMER_DETAILS: "/MilkEntries/getmilkOnId",
