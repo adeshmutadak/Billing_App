@@ -1,4 +1,4 @@
-const BASE_URL = "https://milkbilling-api-d7g5arh9c0chfqc5.eastasia-01.azurewebsites.net/v1/api";
+const BASE_URL = "https://52-3-52-92.sslip.io/v1/api";
 
 // Uploaded photos are served from the site root at /uploads/..., not under
 // /v1/api, so the media base drops that suffix.
@@ -20,6 +20,12 @@ const ENDPOINTS = {
   GET_CUSTOMER_DETAILS: "/MilkEntries/getmilkOnId",
   ADD_MILK_ENTRY: "/MilkEntries",
   SEARCH_CUSTOMER: "/Customer/search",
+
+  // One path serves get-by-id, update and delete:
+  //   GET    /Customer/{id}
+  //   PUT    /Customer      (customerId in the body)
+  //   DELETE /Customer/{id}
+  CUSTOMER: "/Customer",
   DELETE_MILK_ENTRY: "/MilkEntries/deleteMilkEntry",
   UPDATE_MILK_ENTRY: "/MilkEntries/updateMilkEntry",
   BILL: "/Bill",
