@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same green as STATUS.Paid in utils/theme.ts, so the icon and the app
+         share one palette. -->
+    <color name="ic_launcher_background">#2E7D32</color>
+</resources>

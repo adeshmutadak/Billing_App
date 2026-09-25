@@ -21,6 +21,7 @@ import { useToast } from '../../components/Toast';
 import { allCustomersBillHtml, withPhotos } from '../../utils/billHtml';
 import { COLORS, FONTS, SIZES } from '../../utils/theme';
 import AddCustomerScreen from './AddCustomerScreen';
+import CustomerProfileModal from './CustomerProfileModal';
 import {
   MONTHS,
   STATUS_COLORS,
@@ -67,6 +68,9 @@ const CustomerHomeScreen = ({ navigation }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // The customer whose photo was tapped. Null when the profile is closed.
+  const [profileCustomer, setProfileCustomer] = useState(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [loggedUser, setLoggedUser] = useState('');
@@ -370,10 +374,25 @@ const CustomerHomeScreen = ({ navigation }) => {
               style={styles.card}
               onPress={() => openCustomer(item.customer)}
             >
-              <Image
-                source={photoSource(item.customer.photoUrl, defaultCustomerImg)}
-                style={styles.customerImg}
-              />
+              {/* The photo opens the profile; the rest of the card still
+                  opens the month detail. Deliberately home screen only --
+                  the history screen stays read only. */}
+              <TouchableOpacity
+                onPress={() => {
+                  setShowSuggestions(false);
+                  Keyboard.dismiss();
+                  setProfileCustomer(item.customer);
+                }}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Image
+                  source={photoSource(item.customer.photoUrl, defaultCustomerImg)}
+                  style={styles.customerImg}
+                />
+                <View style={styles.photoHint}>
+                  <Ionicons name="create-outline" size={11} color={COLORS.background} />
+                </View>
+              </TouchableOpacity>
 
               <View style={styles.cardBody}>
                 <Text style={styles.customerName} numberOfLines={1}>
@@ -466,6 +485,13 @@ const CustomerHomeScreen = ({ navigation }) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <CustomerProfileModal
+        visible={profileCustomer != null}
+        customer={profileCustomer}
+        onClose={() => setProfileCustomer(null)}
+        onChanged={loadYear}
+      />
 
       <AddCustomerScreen
         visible={showAddModal}
@@ -677,6 +703,21 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
+  },
+  // Small pencil over the photo, so it reads as something you can tap rather
+  // than a decorative avatar.
+  photoHint: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.background,
   },
   cardBody: {
     flex: 1,
